@@ -18,13 +18,15 @@ function App() {
     }
   };
 
-  const classifyWithOpenAI = async (prompt) => {
+  const classifyWithOpenAI = async (productName, packaging) => {
+    const packagingInfo =
+      packaging === "unknown packaging" ? "" : ` with packaging "${packaging}"`;
+    const prompt = `Classify the item "${productName}"${packagingInfo}. Is it Recyclable, Compostable, or Trash in most U.S. cities? Respond with only one word: Recyclable, Compostable, or Trash.`;
+
     try {
       const response = await fetch("http://localhost:5000/classify", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
       });
 
@@ -55,9 +57,7 @@ function App() {
           "Unnamed product";
         const packaging = data.product.packaging || "unknown packaging";
 
-        const prompt = `Is "${productName}" with packaging "${packaging}" recyclable, compostable, or trash in most U.S. cities? Respond with only one word: Recyclable, Compostable, or Trash.`;
-
-        const classification = await classifyWithOpenAI(prompt);
+        const classification = await classifyWithOpenAI(productName, packaging);
         setResult(`${classification} (${productName})`);
         setLog((prev) => [
           ...prev,
@@ -90,7 +90,7 @@ function App() {
     <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center">
       <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
         <Header />
-        <ItemInput onClassify={handleClassify} />
+
         <DisposalResult result={result} />
 
         {error && (
@@ -106,6 +106,13 @@ function App() {
         )}
 
         <BarcodeScanner onScan={handleBarcodeScan} />
+
+        {/* Fallback Manual Input */}
+        <div className="mt-6 text-center">
+          <h3 className="text-lg font-semibold mb-2">Manual Classification</h3>
+          <p className="text-sm text-gray-600 mb-2">Not sure about a product? Type it in:</p>
+          <ItemInput onClassify={handleClassify} />
+        </div>
 
         {/* Waste Totals */}
         <div className="mt-6 grid grid-cols-3 gap-4 text-center">
@@ -148,5 +155,4 @@ function App() {
 }
 
 export default App;
-
 
