@@ -1,0 +1,9 @@
+#reader__dashboard_section_csr {
+  background: rgba(0,0,0,0.5) !important;
+}
+
+#reader__camera_permission_button {
+  background: #059669 !important;
+  padding: 10px 20px !important;
+  border-radius: 5px !important;
+}

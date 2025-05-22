@@ -2,26 +2,25 @@ import Header from "./components/Header";
 import ItemInput from "./components/ItemInput";
 import DisposalResult from "./components/DisposalResult";
 import BarcodeScanner from "./components/BarcodeScanner";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import "./styles/scanner.css";
+
 
 function App() {
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [lastScanned, setLastScanned] = useState("");
   const [log, setLog] = useState([]);
-
-  const handleClassify = async (item) => {
-    if (item.toLowerCase().includes("bottle")) {
-      setResult("♻️ Recyclable");
-    } else {
-      setResult("🗑 Trash");
-    }
-  };
+  const [isLoading, setIsLoading] = useState(false);
+  const retryCount = useRef(0);
+  const MAX_RETRIES = 3;
 
   const classifyWithOpenAI = async (productName, packaging) => {
-    const packagingInfo =
-      packaging === "unknown packaging" ? "" : ` with packaging "${packaging}"`;
-    const prompt = `Classify the item "${productName}"${packagingInfo}. Is it Recyclable, Compostable, or Trash in most U.S. cities? Respond with only one word: Recyclable, Compostable, or Trash.`;
+    const packagingInfo = packaging === "unknown packaging" ? "" : ` with packaging "${packaging}"`;
+    const prompt = `As a waste classification expert, analyze "${productName}"${packagingInfo}. 
+      Consider material composition and local recycling rules. 
+      Should this be: Recyclable, Compostable, or Trash in most U.S. municipalities?
+      Respond ONLY with one word: Recyclable, Compostable, or Trash.`;
 
     try {
       const response = await fetch("http://localhost:5000/classify", {
@@ -38,18 +37,43 @@ function App() {
     }
   };
 
+  const handleClassify = async (item) => {
+    setIsLoading(true);
+    try {
+      const classification = await classifyWithOpenAI(item, "manual input");
+      setResult(`${classification} (${item})`);
+      setLog((prev) => [
+        ...prev,
+        {
+          product: item,
+          classification,
+          time: new Date().toLocaleString()
+        }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleBarcodeScan = async (barcode) => {
     console.log("Scanned barcode:", barcode);
     setLastScanned(barcode);
     setError("");
+    setIsLoading(true);
 
     try {
+      if (retryCount.current >= MAX_RETRIES) {
+        setError("Maximum retries reached. Try manual input.");
+        return;
+      }
+
       const response = await fetch(
         `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`
       );
       const data = await response.json();
 
       if (data.status === 1) {
+        retryCount.current = 0;
         const productName =
           data.product.product_name ||
           data.product.generic_name ||
@@ -68,8 +92,18 @@ function App() {
           },
         ]);
       } else {
+        throw new Error("Product not found");
+      }
+    } catch (error) {
+      console.error("API error:", error);
+      retryCount.current += 1;
+      
+      if (retryCount.current < MAX_RETRIES) {
+        setTimeout(() => handleBarcodeScan(barcode), 1000);
+        setError(`Retrying... (${retryCount.current}/${MAX_RETRIES})`);
+      } else {
         setResult("🗑 Product not found");
-        setError("Product not found. Try again?");
+        setError("Product not found. Try manual input?");
         setLog((prev) => [
           ...prev,
           {
@@ -79,10 +113,8 @@ function App() {
           },
         ]);
       }
-    } catch (error) {
-      console.error("API error:", error);
-      setResult("Error fetching product info.");
-      setError("Network error. Try again?");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -92,6 +124,10 @@ function App() {
         <Header />
 
         <DisposalResult result={result} />
+
+        {isLoading && (
+          <div className="text-center mt-4 text-gray-600">Analyzing...</div>
+        )}
 
         {error && (
           <div className="text-red-600 text-center mt-2">
@@ -155,4 +191,3 @@ function App() {
 }
 
 export default App;
-

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5QrcodeScanner, Html5QrcodeScanType, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
 const BarcodeScanner = ({ onScan }) => {
   const [hasScanned, setHasScanned] = useState(false);
@@ -8,12 +8,21 @@ const BarcodeScanner = ({ onScan }) => {
   useEffect(() => {
     if (hasScanned) return;
 
-    scannerRef.current = new Html5QrcodeScanner("reader", {
-      fps: 15,
-      qrbox: { width: 250, height: 250 }, // larger area
-      aspectRatio: 1.777,
-      disableFlip: true,
-    });
+    const config = {
+      fps: 30,
+      qrbox: { width: 300, height: 150 },
+      aspectRatio: 1.333,
+      facingMode: "environment",
+      supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.EAN_8
+      ]
+    };
+
+    scannerRef.current = new Html5QrcodeScanner("reader", config, false);
 
     scannerRef.current.render(
       (decodedText) => {
@@ -21,7 +30,11 @@ const BarcodeScanner = ({ onScan }) => {
         onScan(decodedText);
       },
       (error) => {
-        // silent scan fail
+        if (error?.includes("No MultiFormat Readers were able to detect")) {
+          console.log("Scanning...");
+        } else {
+          console.warn("Scan error:", error);
+        }
       }
     );
 
