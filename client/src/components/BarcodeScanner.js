@@ -13,7 +13,7 @@ export default function BarcodeScanner({ onScan }) {
     scanner
       .start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
+        { fps: 15, qrbox: { width: 200, height: 150 } },
         (decodedText) => {
           console.log("Scanned:", decodedText);
           onScan(decodedText);
